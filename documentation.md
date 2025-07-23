@@ -37,9 +37,10 @@ The engine processes inventory data for every product across all pharmacy branch
 *   **Max_Stock:** Typically set as a multiple of `Min_Stock` (e.g., `Min_Stock * Max_Stock_Factor`).
 
 **Example:**
-| SKU   | Branch  | Branch Stock | Min | Max | Sales_30D |
-| :---- | :------ | :----------- | :-- | :-- | :-------- |
-| A123  | Al Quoz | 10           | 15  | 40  | 30        |
+
+| SKU   | Branch    | Branch Stock | Min | Max | Sales_30D |
+| :---- | :-------- | :----------- | :-- | :-- | :-------- |
+| A123  | Al Quoz   | 10           | 15  | 40  | 30        |
 
 In this example, `Branch_Stock` (10) is less than `Min_Stock` (15). The `ReorderQty` is calculated as `40 - 10 = 30` units.
 
@@ -58,6 +59,7 @@ This check is performed for every product at every branch.
 *   **Partial Fulfillment (Edge Case Handling):** If `Warehouse_Stock` is less than the `ReorderQty`, the system allocates only the available `Warehouse_Stock` to the branch. The remaining unfulfilled quantity is then flagged for an LPO.
 
 **Example (Full Fulfillment):**
+
 | SKU  | Reorder Needed | Warehouse Stock |
 | :--- | :------------- | :-------------- |
 | A123 | 30             | 100             |
@@ -65,6 +67,7 @@ This check is performed for every product at every branch.
 In this case, the warehouse has enough stock (100 >= 30). A transfer order for 30 units will be created.
 
 **Example (Partial Fulfillment):**
+
 | SKU  | Reorder Needed | Warehouse Stock |
 | :--- | :------------- | :-------------- |
 | B456 | 40             | 15              |
@@ -81,8 +84,9 @@ Here, the warehouse has insufficient stock (15 < 40). The system will:
 For every product and branch where stock was allocated from the warehouse (either fully or partially), a record is created in the Transfer Orders list.
 
 **Output Format:**
-| SKU | From_Warehouse | To_Branch | Transfer_Qty |
-| :-- | :------------- | :-------- | :----------- |
+
+| SKU  | From_Warehouse | To_Branch | Transfer_Qty |
+| :--- | :------------- | :-------- | :----------- |
 | A123 | WH01           | Al Quoz   | 30           |
 | B456 | WH01           | Deira     | 15           |
 
@@ -94,8 +98,9 @@ For every product and branch where stock was allocated from the warehouse (eithe
 For every product that could not be fully fulfilled by the warehouse, an LPO need is generated. These needs are grouped by SKU and Vendor to create consolidated purchase requests.
 
 **Output Format:**
-| SKU | Required_Qty | Vendor |
-| :-- | :----------- | :----- |
+
+| SKU  | Required_Qty | Vendor   |
+| :--- | :----------- | :------- |
 | B456 | 25           | Vendor B |
 | D789 | 100          | Vendor C |
 
@@ -140,7 +145,3 @@ Upon completion of each replenishment engine run, the following CSV files are ge
 *   **`Transfer_Orders.csv`:** Details all products and quantities to be transferred from the central warehouse to specific branches.
 *   **`LPO_Needs.csv`:** Lists all products, required quantities, and associated vendors for external procurement.
 *   **`Excess_Stock.csv`:** Identifies products at branches that are overstocked, including the calculated excess quantity based on Days of Stock.
-
-## 5. Conclusion
-
-The Replenishment Engine provides a robust, data-driven solution for optimizing inventory management within the pharmacy network. By automating key decision-making processes and providing clear, actionable outputs, it supports efficient stock allocation, timely procurement, and effective management of excess inventory.

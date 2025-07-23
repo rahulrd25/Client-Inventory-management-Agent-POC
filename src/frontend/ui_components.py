@@ -1,5 +1,5 @@
 import streamlit as st
-from frontend.utils import get_logo_base64, load_file
+from .utils import get_logo_base64, load_file
 import pandas as pd
 
 def set_page_config():
