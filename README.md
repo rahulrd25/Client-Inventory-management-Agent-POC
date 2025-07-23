@@ -8,6 +8,12 @@ This project implements a Replenishment Engine designed to optimize inventory le
 *   **Stock Allocation & LPO Generation:** Allocates available stock from the central warehouse to fulfill branch requirements. For any unfulfilled demand, it generates Local Purchase Orders (LPOs) for external procurement.
 *   **Excess Stock Identification:** Identifies and flags products at branches that hold inventory exceeding optimal levels, using a "Days of Stock" (DOS) metric.
 
+## Tech Stack
+
+*   **Python:** The core programming language used for the engine logic.
+*   **Streamlit:** Used for building the interactive web application interface.
+*   **Pandas:** Utilized for efficient data manipulation and analysis of CSV files.
+
 ## Operational Logic Overview
 
 The engine processes inventory data through a systematic flow:
