@@ -34,6 +34,12 @@ Upon completion of each replenishment engine run, the following CSV files are ge
 *   `LPO_Needs.csv`: Lists all products, required quantities, and associated vendors for external procurement.
 *   `Excess_Stock.csv`: Identifies products at branches that are overstocked, including the calculated excess quantity based on Days of Stock.
 
+## Demo Video
+
+Watch a quick demonstration of the Replenishment Engine in action:
+
+[![Loom Video](https://www.loom.com/assets/img/loom-video-thumb.png)](https://www.loom.com/share/211c44e0825e4365aaf13e7d0b943c2d?sid=b4f213d5-d8e5-4a02-9ae0-154dd353f4c0)
+
 ## How to Run the Application
 
 This application is built using Streamlit.
