@@ -94,7 +94,7 @@ def render_results_section():
         </div>
         """, unsafe_allow_html=True)
 
-        st.header("Replenishment Results")
+        st.markdown("<h2 style=\"text-align: center;\">Click to download Results</h2>", unsafe_allow_html=True)
 
         col1, col2, col3 = st.columns(3)
 

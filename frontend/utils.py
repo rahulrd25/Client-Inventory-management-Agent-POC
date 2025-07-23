@@ -82,7 +82,8 @@ def apply_custom_css():
         h2 {
             color: #000000; /* Black font color */
             font-weight: 500; /* Make it bold */
-            font-size: 1.2rem; /* Slightly larger font size */
+            font-size: 0.7rem; /* Further reduced font size */
+            font-family: sans-serif; /* Simple font */
             margin-top: 2rem;
             margin-bottom: 2rem;
         }
@@ -135,7 +136,7 @@ def apply_custom_css():
 
         /* Styling for download button text */
         .stDownloadButton > button {
-            background: #1E90FF; /* Vibrant Blue */
+            background: #000000; /* Black background */
             color: #FFFFFF; /* White text */
             font-weight: 700;
             border: none;
@@ -148,7 +149,7 @@ def apply_custom_css():
 
 
         .stDownloadButton > button:hover {
-            background: #0056b3; /* Darker blue on hover */
+            background: #000000; /* Black on hover */
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
 

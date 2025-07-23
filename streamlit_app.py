@@ -172,6 +172,8 @@ elif st.session_state.app_state == RESULTS_STATE:
     render_header() # Keep header visible in results
     render_results_section()
 
+    st.markdown("<br><br><br><br>", unsafe_allow_html=True) # Adds more line breaks for spacing
+
     # Add a button to reset the app
     if st.button("Start Over", key="reset_button"):
         st.session_state.app_state = UPLOAD_STATE
