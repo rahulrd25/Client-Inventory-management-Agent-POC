@@ -185,7 +185,7 @@ elif st.session_state.app_state == RESULTS_STATE:
         # No need to check if recipient_email is empty as it's hardcoded
             output_path = "outputs"
             attachment_paths = [
-                os.path.join(output_path, "Transfer_Orders.csv"),
+                os.path.join(output_path, "Transfer_Orders.xlsx"),
                 os.path.join(output_path, "LPO_Needs.csv"),
                 os.path.join(output_path, "Excess_Stock.csv")
             ]

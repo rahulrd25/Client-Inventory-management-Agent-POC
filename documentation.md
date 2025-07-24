@@ -56,7 +56,10 @@ This check is performed for every product at every branch.
 
 **Allocation Logic:**
 *   **Full Fulfillment:** If `Warehouse_Stock` is greater than or equal to the `ReorderQty` for a branch, the entire `ReorderQty` is allocated from the warehouse.
-*   **Partial Fulfillment (Edge Case Handling):** If `Warehouse_Stock` is less than the `ReorderQty`, the system allocates only the available `Warehouse_Stock` to the branch. The remaining unfulfilled quantity is then flagged for an LPO.
+*   **Partial Fulfillment:** If `Warehouse_Stock` is less than the `ReorderQty` but greater than 0, the system allocates only the available `Warehouse_Stock` to the branch. The remaining unfulfilled quantity is then flagged for an LPO.
+*   **No Fulfillment:** If `Warehouse_Stock` is 0, no stock is allocated from the warehouse, and the entire `ReorderQty` is flagged for an LPO.
+
+**Important Note on Sequential Allocation:** The `Warehouse_Stock` used for allocation is a dynamically updated value. It reflects the remaining stock after previous branches (for the same SKU) have received their allocations. This means `Warehouse_Stock` can decrease during the allocation process for a single SKU across multiple branches.
 
 **Example (Full Fulfillment):**
 
@@ -83,14 +86,28 @@ Here, the warehouse has insufficient stock (15 < 40). The system will:
 **Process:**
 For every product and branch where stock was allocated from the warehouse (either fully or partially), a record is created in the Transfer Orders list.
 
-**Output Format:**
+**Output Format (All_Transfer_Orders Sheet in Transfer_Orders.xlsx):**
 
-| SKU  | From_Warehouse | To_Branch | Transfer_Qty |
-| :--- | :------------- | :-------- | :----------- |
-| A123 | WH01           | Al Quoz   | 30           |
-| B456 | WH01           | Deira     | 15           |
+| SKU  | From_Warehouse | To_Branch | Min_Stock | Max_Stock | Branch_Stock | Transfer_Qty | Warehouse_Stock |
+| :--- | :------------- | :-------- | :-------- | :-------- | :----------- | :----------- | :-------------- |
+| A123 | WH01           | Al Quoz   | 15        | 40        | 10           | 30           | 100             |
+| B456 | WH01           | Deira     | 20        | 50        | 10           | 15           | 15              |
 
-### 3.4. Step 4: Prepare and Flag LPO Needs
+### 3.4. Step 4: Track LPO Triggering Transfers (LPO_Trigger_Transfers Sheet)
+
+**Objective:** Provide a detailed view of all transfers that resulted in an LPO being triggered, either due to partial fulfillment from the warehouse or complete stockout.
+
+**Process:**
+For each reorder request that could not be fully satisfied by the warehouse, a record is added to this sheet. This helps in reviewing the LPO generation logic and understanding the reasons for shortfalls.
+
+**Output Format (LPO_Trigger_Transfers Sheet in Transfer_Orders.xlsx):**
+
+| SKU  | Branch | ReorderQty | Transfer_Qty_from_WH | Warehouse_Stock_After_Transfer | LPO_Shortfall | Reason |
+| :--- | :----- | :--------- | :------------------- | :----------------------------- | :------------ | :----- |
+| B456 | Deira  | 40         | 15                   | 0                              | 25            | Partial Allocation |
+| D789 | Al Ain | 100        | 0                    | 0                              | 100           | Warehouse Out of Stock |
+
+### 3.5. Step 5: Prepare and Flag LPO Needs
 
 **Objective:** Consolidate and list all products that require external procurement from suppliers due to insufficient warehouse stock.
 
@@ -113,7 +130,7 @@ For the current prototype phase, the "sending" of LPOs is simulated by generatin
 
 The system also provides a count of the total LPOs generated in each run, fulfilling the requirement for tracking.
 
-### 3.6. Step 6: Identify Excess Stock
+### 3.7. Step 7: Identify Excess Stock
 
 **Objective:** Identify products at branches that are overstocked, enabling proactive inventory balancing and reducing holding costs.
 
@@ -122,26 +139,32 @@ Excess stock is determined using a "Days of Stock" (DOS) metric, which relates c
 
 **Calculation:**
 1.  **Average Daily Sales (ADS):** Calculated as `Sales_30D / 30`.
-2.  **Target Stock for Excess:** This is the stock level considered "optimal" for a given number of days. It is calculated as `ADS * Configurable_Excess_DOS_Threshold`.
-    *   **Edge Case:** If `ADS` is 0 (no sales in the last 30 days), the `Target Stock for Excess` is considered 0 to ensure any stock is flagged as excess.
-3.  **Excess Quantity:** Calculated as `Branch_Stock - Target_Stock_for_Excess`. Only positive values indicate excess.
+2.  **70-Day Target Stock:** This is the stock level considered "optimal" for a given number of days. It is calculated as `ADS * Configurable_Excess_DOS_Threshold`.
+    *   **Edge Case:** If `ADS` is 0 (no sales in the last 30 days), the `70-Day Target Stock` is considered 0 to ensure any stock is flagged as excess.
+3.  **Excess Quantity:** Calculated as `Branch_Stock - 70-Day Target Stock`. Only positive values indicate excess.
 
 **Configurable Parameter:**
-The `Configurable_Excess_DOS_Threshold` is a parameter that can be adjusted (defaulting to 60 days in the current implementation). This allows stakeholders to define what constitutes "excess" based on business policy.
+The `Configurable_Excess_DOS_Threshold` is a parameter that can be adjusted (defaulting to 70 days in the current implementation). This allows stakeholders to define what constitutes "excess" based on business policy.
 
 **Example:**
 If a branch has `Sales_30D` of 30 units (meaning 1 unit/day ADS) and `Branch_Stock` of 80 units, with an `EXCESS_DOS_THRESHOLD` of 70 days:
-*   `Target Stock for Excess` = 1 unit/day * 70 days = 70 units.
-*   `Excess Quantity` = 80 (Branch_Stock) - 70 (Target Stock) = 10 units.
+*   `70-Day Target Stock` = 1 unit/day * 70 days = 70 units.
+*   `Excess Quantity` = 80 (Branch_Stock) - 70 (70-Day Target Stock) = 10 units.
     This means the branch has 10 units of excess stock, equivalent to 10 days of supply.
 
-**Output Format:**
-The identified excess stock is outputted with details such as Branch, SKU, Product Name, current Branch Stock, Sales_30D, Average Daily Sales, the calculated Target Stock for Excess, and the Excess Quantity.
+**Output Format (Excess_Stock.csv):**
+The identified excess stock is outputted with details such as Branch, SKU, Product Name, current Branch Stock, Min_Stock, Max_Stock, Total_Branch_Requirement, Sales_30D, Average Daily Sales, 70D Target(daily*70), and Excess(branch stock - 70D target). All calculated numerical values are rounded to two decimal places.
+
+| Branch | SKU  | Product_Name | Branch_Stock | Min_Stock | Max_Stock | Total_Branch_Requirement | Sales_30D | Avg_Daily_Sales | 70D Target(daily*70) | Excess(branch stock - 70D target) |
+| :----- | :--- | :----------- | :----------- | :-------- | :-------- | :----------------------- | :-------- | :-------------- | :------------------- | :-------------------------------- |
+| BR001  | A123 | Product A    | 100          | 15        | 40        | 0                        | 66        | 2.20            | 154.00               | 23.00                             |
 
 ## 4. Outputs
 
-Upon completion of each replenishment engine run, the following CSV files are generated in the `outputs/` directory:
+Upon completion of each replenishment engine run, the following files are generated in the `outputs/` directory:
 
-*   **`Transfer_Orders.csv`:** Details all products and quantities to be transferred from the central warehouse to specific branches.
+*   **`Transfer_Orders.xlsx`:** An Excel workbook containing two sheets:
+    *   **`All_Transfer_Orders`**: Details all products and quantities to be transferred from the central warehouse to specific branches, including Min/Max stock, Branch Stock, and Warehouse Stock before transfer.
+    *   **`LPO_Trigger_Transfers`**: Specifically lists transfers that resulted in an LPO being triggered, providing details like Reorder Quantity, Transfer Quantity from Warehouse, Warehouse Stock After Transfer, LPO Shortfall, and the Reason for the LPO (Partial Allocation or Warehouse Out of Stock).
 *   **`LPO_Needs.csv`:** Lists all products, required quantities, and associated vendors for external procurement.
-*   **`Excess_Stock.csv`:** Identifies products at branches that are overstocked, including the calculated excess quantity based on Days of Stock.
+*   **`Excess_Stock.csv`:** Identifies products at branches that are overstocked, including the calculated excess quantity based on Days of Stock, along with Min/Max stock, Total Branch Requirement, and rounded daily sales and excess figures.

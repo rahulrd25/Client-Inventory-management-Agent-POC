@@ -1,6 +1,6 @@
 import streamlit as st
+import os
 from .utils import get_logo_base64, load_file
-import pandas as pd
 
 def set_page_config():
     """
@@ -63,9 +63,6 @@ def render_file_uploader():
         sku_master_df is not None
     )
 
-    
-        
-
     return branch_df, warehouse_df, sku_master_df, all_required_files_uploaded
 
 def render_results_section():
@@ -101,10 +98,10 @@ def render_results_section():
         with col1:
             if not st.session_state.transfer_orders.empty:
                 st.download_button(
-                    label="Transfer Orders CSV",
-                    data=st.session_state.transfer_orders.to_csv(index=False).encode('utf-8'),
-                    file_name="Transfer_Orders.csv",
-                    mime="text/csv",
+                    label="Transfer Orders",
+                    data=open(os.path.join("outputs", "Transfer_Orders.xlsx"), "rb").read(),
+                    file_name="Transfer_Orders.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     key="download_transfer_orders"
                 )
             else:
@@ -113,7 +110,7 @@ def render_results_section():
         with col2:
             if not st.session_state.lpo_needs.empty:
                 st.download_button(
-                    label="LPO Needs CSV",
+                    label="LPO Needs",
                     data=st.session_state.lpo_needs.to_csv(index=False).encode('utf-8'),
                     file_name="LPO_Needs.csv",
                     mime="text/csv",
@@ -125,7 +122,7 @@ def render_results_section():
         with col3:
             if not st.session_state.excess_stock.empty:
                 st.download_button(
-                    label="Excess Stock CSV",
+                    label="Excess Stock",
                     data=st.session_state.excess_stock.to_csv(index=False).encode('utf-8'),
                     file_name="Excess_Stock.csv",
                     mime="text/csv",

@@ -22,7 +22,7 @@ def clear_output_directory(output_path):
 
 
 # Define a configurable threshold for excess stock in days of supply
-EXCESS_DOS_THRESHOLD = 60 # Defaulting to 60 days, can be adjusted
+EXCESS_DOS_THRESHOLD = 70 # As per new requirement
 
 def run_replenishment_engine(
     branch_inventory_df=None,
@@ -77,17 +77,29 @@ def run_replenishment_engine(
     # --- 4. Allocate Stock & Create LPO ---
     transfer_orders_list = []
     lpo_needs_list = []
+    lpo_trigger_transfers_list = []
     available_warehouse_stock = warehouse_stock.set_index('SKU')['Warehouse_Stock'].to_dict()
     reorder_df = merged_data[merged_data['ReorderQty'] > 0].sort_values(by='SKU')
 
     for _, row in reorder_df.iterrows():
         sku = row['SKU']
         reorder_qty = row['ReorderQty']
-        fulfillable_qty = min(reorder_qty, available_warehouse_stock.get(sku, 0))
+        
+        # Capture initial warehouse stock for this SKU before any deductions for this specific reorder
+        initial_warehouse_stock_for_sku = available_warehouse_stock.get(sku, 0)
+
+        fulfillable_qty = min(reorder_qty, initial_warehouse_stock_for_sku)
 
         if fulfillable_qty > 0:
             transfer_orders_list.append({
-                'SKU': sku, 'From_Warehouse': 'WH01', 'To_Branch': row['Branch'], 'Transfer_Qty': fulfillable_qty
+                'SKU': sku,
+                'From_Warehouse': 'WH01',
+                'To_Branch': row['Branch'],
+                'Min_Stock': row['Min_Stock'],
+                'Max_Stock': row['Max_Stock'],
+                'Branch_Stock': row['Branch_Stock'],
+                'Transfer_Qty': fulfillable_qty,
+                'Warehouse_Stock': initial_warehouse_stock_for_sku  # Stock before this specific transfer
             })
             available_warehouse_stock[sku] -= fulfillable_qty
 
@@ -97,7 +109,25 @@ def run_replenishment_engine(
                 'SKU': sku, 'Required_Qty': lpo_shortfall, 'Vendor': row['Vendor']
             })
 
+            # Capture LPO trigger details for the new sheet
+            reason = "Partial Allocation" if fulfillable_qty > 0 else "Warehouse Out of Stock"
+            lpo_trigger_transfers_list.append({
+                'SKU': sku,
+                'Branch': row['Branch'],
+                'ReorderQty': reorder_qty,
+                'Transfer_Qty_from_WH': fulfillable_qty,
+                'Warehouse_Stock_Before_Transfer': initial_warehouse_stock_for_sku, # Use the captured initial stock
+                'Warehouse_Stock_After_Transfer': available_warehouse_stock.get(sku, 0), # This is the stock after deduction
+                'LPO_Shortfall': lpo_shortfall,
+                'Reason': reason
+            })
+
     transfer_orders_df = pd.DataFrame(transfer_orders_list)
+    if not transfer_orders_df.empty:
+        transfer_orders_df = transfer_orders_df[[
+            'SKU', 'From_Warehouse', 'To_Branch', 'Min_Stock', 'Max_Stock',
+            'Branch_Stock', 'Transfer_Qty', 'Warehouse_Stock'
+        ]]
     lpo_needs_df = pd.DataFrame(lpo_needs_list)
     if not lpo_needs_df.empty:
         lpo_needs_df = lpo_needs_df.groupby(['SKU', 'Vendor'])['Required_Qty'].sum().reset_index()
@@ -106,26 +136,50 @@ def run_replenishment_engine(
     # Calculate Average Daily Sales (ADS) from Sales_30D
     merged_data['Avg_Daily_Sales'] = merged_data['Sales_30D'] / 30
 
-    # Calculate target stock based on EXCESS_DOS_THRESHOLD
-    # Handle cases where Avg_Daily_Sales is 0 to avoid division by zero or unrealistic excess
+    # Rename ReorderQty to Total_Branch_Requirement for clarity
+    merged_data.rename(columns={'ReorderQty': 'Total_Branch_Requirement'}, inplace=True)
+
+    # Calculate Target Excess Stock and Excess Quantity
     merged_data['Target_Excess_Stock'] = merged_data.apply(
         lambda row: row['Avg_Daily_Sales'] * EXCESS_DOS_THRESHOLD if row['Avg_Daily_Sales'] > 0 else 0,
         axis=1
     )
-
-    # Calculate Excess Quantity
     merged_data['ExcessQty'] = merged_data.apply(
         lambda row: max(0, row['Branch_Stock'] - row['Target_Excess_Stock']),
         axis=1
     )
 
+    # Create the specific columns requested for the output file
+    merged_data['70D Target(daily*70)'] = merged_data['Target_Excess_Stock']
+    merged_data['Excess(branch stock - 70D target)'] = merged_data['ExcessQty']
+
     excess_stock_df = merged_data[merged_data['ExcessQty'] > 0][[
-        'Branch', 'SKU', 'Product_Name', 'Branch_Stock', 'Sales_30D', 'Avg_Daily_Sales', 'Target_Excess_Stock', 'ExcessQty'
+        'Branch', 'SKU', 'Product_Name', 'Branch_Stock', 'Min_Stock', 'Max_Stock',
+        'Total_Branch_Requirement', 'Sales_30D', 'Avg_Daily_Sales',
+        'Target_Excess_Stock', 'ExcessQty', '70D Target(daily*70)', 'Excess(branch stock - 70D target)'
     ]]
+
+    # Round the calculated fields to 2 decimal places
+    for col in ['Avg_Daily_Sales', 'Target_Excess_Stock', 'ExcessQty', '70D Target(daily*70)', 'Excess(branch stock - 70D target)']:
+        if col in excess_stock_df.columns:
+            excess_stock_df[col] = excess_stock_df[col].round(2)
 
     # --- 6. Save All Outputs ---
     os.makedirs(output_path, exist_ok=True)
-    transfer_orders_df.to_csv(os.path.join(output_path, "Transfer_Orders.csv"), index=False)
+    lpo_trigger_transfers_df = pd.DataFrame(lpo_trigger_transfers_list)
+    if not lpo_trigger_transfers_df.empty:
+        lpo_trigger_transfers_df = lpo_trigger_transfers_df[[
+            'SKU', 'Branch', 'ReorderQty', 'Transfer_Qty_from_WH',
+            'Warehouse_Stock_After_Transfer',
+            'LPO_Shortfall', 'Reason'
+        ]]
+
+    # Save Transfer Orders to an Excel file with multiple sheets
+    transfer_orders_excel_path = os.path.join(output_path, "Transfer_Orders.xlsx")
+    with pd.ExcelWriter(transfer_orders_excel_path, engine='openpyxl') as writer:
+        transfer_orders_df.to_excel(writer, sheet_name='All_Transfer_Orders', index=False)
+        if not lpo_trigger_transfers_df.empty:
+            lpo_trigger_transfers_df.to_excel(writer, sheet_name='LPO_Trigger_Transfers', index=False)
     lpo_needs_df.to_csv(os.path.join(output_path, "LPO_Needs.csv"), index=False)
     excess_stock_df.to_csv(os.path.join(output_path, "Excess_Stock.csv"), index=False)
 

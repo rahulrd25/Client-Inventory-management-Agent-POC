@@ -41,7 +41,12 @@ for sku in sku_ids:
 
         # Generate current Branch_Stock
         # Introduce scenarios for excess stock based on DOS
-        if avg_daily_sales > 0 and np.random.rand() < 0.15: # 15% chance of excess stock for items with sales
+        if avg_daily_sales > 0 and np.random.rand() < 0.1: # 10% chance of special case
+            # Case 1: High Min_Stock, but also high Branch_Stock (triggering both reorder and excess)
+            min_stock = int(avg_daily_sales * EXCESS_DOS_THRESHOLD * 1.5) # Very high min stock
+            max_stock = int(min_stock * 1.2)
+            branch_stock = int(min_stock * 0.9) # Below min, but still high
+        elif avg_daily_sales > 0 and np.random.rand() < 0.15: # 15% chance of excess stock for items with sales
             # Ensure stock is significantly above the EXCESS_DOS_THRESHOLD
             target_stock_for_excess = int(avg_daily_sales * EXCESS_DOS_THRESHOLD * 1.2) # 20% above threshold
             branch_stock = randint(max(max_stock + 10, target_stock_for_excess), target_stock_for_excess + 50)

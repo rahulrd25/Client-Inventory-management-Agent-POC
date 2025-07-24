@@ -19,7 +19,7 @@ This project implements a Replenishment Engine designed to optimize inventory le
 The engine processes inventory data through a systematic flow:
 
 1.  **Identify Branch Replenishment Needs:** Calculates `ReorderQty` for each product at each branch if `Branch_Stock` is below `Min_Stock`. `Min_Stock` and `Max_Stock` are dynamically calculated based on `Sales_30D` and `Lead_Time_Days`.
-2.  **Check Warehouse for Stock Availability:** Attempts to fulfill `ReorderQty` from `Warehouse_Stock`. If warehouse stock is insufficient, the remaining quantity is flagged for an LPO.
+2.  **Check Warehouse for Stock Availability:** Attempts to fulfill `ReorderQty` from `Warehouse_Stock`. If warehouse stock is insufficient, a partial allocation is made, and the remaining quantity is flagged for an LPO.
 3.  **Create Transfer Orders:** Generates a detailed list of products to be moved from the central warehouse to specific branches.
 4.  **Prepare and Flag LPO Needs:** Consolidates and lists all products requiring external procurement due to insufficient warehouse stock.
 5.  **Identify Excess Stock:** Calculates excess stock using a "Days of Stock" (DOS) metric, based on `Branch_Stock` and `Sales_30D`.
@@ -36,7 +36,7 @@ The application requires the following CSV files to be uploaded:
 
 Upon completion of each replenishment engine run, the following CSV files are generated in the `outputs/` directory:
 
-*   `Transfer_Orders.csv`: Details all products and quantities to be transferred from the central warehouse to specific branches.
+*   **`Transfer_Orders.csv`:** Details all products and quantities to be transferred from the central warehouse to specific branches. Includes `Min_Stock`, `Max_Stock`, `Branch_Stock`, and `Warehouse_Stock` for easier review.
 *   `LPO_Needs.csv`: Lists all products, required quantities, and associated vendors for external procurement.
 *   `Excess_Stock.csv`: Identifies products at branches that are overstocked, including the calculated excess quantity based on Days of Stock.
 
